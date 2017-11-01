@@ -2,9 +2,11 @@
 Pin and IO configuration for RC Car
 */
 
-#define speed1=100;
-#define pwm1 = 5;
-#define pwm2 = 6;
-#define dir1 = 4;
-#define dir2 = 7;
-#define LED = 13;
+#define LED 13
+#define MOTOR_A_DIR 1
+#define MOTOR_A_PWM 2
+#define MOTOR_B_DIR 3
+#define MOTOR_B_PWM 4
+#define PWM_SLOW 50  
+#define PWM_FAST 200 
+#define DIR_DELAY 1000 
