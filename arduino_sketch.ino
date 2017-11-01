@@ -10,6 +10,8 @@ int DIR_DELAY 1000;
 unsigned int pulsesperturn = 20;
 unsigned int RPM_L 0;
 unsigned int RPM_R 0;
+unsigned int counter_L 0;
+unsigned int counter_R 0;
 char charreceive;
 //------------------------------------------------------------------------------------------------FUNCTIONS
 void goforward();
@@ -17,7 +19,8 @@ void goleft();
 void goright();
 void goback();
 void stopcommand();
-void docount();
+void counter_L();
+void counter_R();
 
 //------------------------------------------------------------------------------------------------SETUP
 void setup() {
@@ -27,6 +30,8 @@ void setup() {
   pinMode(MOTOR_B_RIGHT_DIR,OUTPUT);
   pinMode(MOTOR_B_RIGHT_PWM,OUTPUT);
   pinMode(LED,OUTPUT);
+  pinMode(TACHO_L, INPUT);
+  pinMode(TACHO_R, INPUT);
   
   for (int i=0; i<=5; i++) { //blink LED 5 times to show car is ready
   digitalWrite(LED, HIGH);   
@@ -34,6 +39,13 @@ void setup() {
   digitalWrite(LED, LOW);    
   delay(200);
   }              
+  attachInterrupt(2, counter_L, FALLING);
+  attachInterrupt(3, counter_R, FALLING);
+  counter_L = 0;
+  counter_R = 0;
+  RPM_L = 0;
+  RPM_R = 0;
+  timeold = 0;
   Serial.begin(9600);
   Serial.println("Car control established");
   delay(500);
@@ -56,12 +68,31 @@ void loop() {
      }
     //else{stopcommand();}
   }
+//-----------------------------------------------------------------------------------RPM
+  if (millis() - timeold >= 1000){
+        detachInterrupt(2);
+        RPM_L = (60 * 1000 / pulsesperturn )/ (millis() - timeold)* counter_L;
+        RPM_R = (60 * 1000 / pulsesperturn )/ (millis() - timeold)* counter_R;
+        timeold = millis();
+        counter_L = 0;
+        counter_R = 0;
+        Serial.print("RPM_L=");
+        Serial.println(RPM_L,DEC);
+        Serial.print(" "); //placeholder
+        Serial.print("RPM_R=");
+        Serial.println(RPM_R,DEC);
+        attachInterrupt(2, counter_L, FALLING);
+        attachInterrupt(3, counter_R, FALLING);
+    }
 
-}
+
 if(digitalRead(BT_STATE)==LOW){stopcommand();} //stop car if Bluetooth connection is lost
+}
 
-void docount(){counter++;}  //increase count by 1
-
+//------------------------------------------------------------------------------------FUNCTION-DEFINITIONS
+void counter_L(){counter_L++;}  //increase count by 1
+void counter_R(){counter_R++;}  //increase count by 1
+//------------------------------------------------------------------------------------COUNTER
 void goforward(){
         Serial.println( "Forward" );
         // always stop motors briefly before abrupt changes
