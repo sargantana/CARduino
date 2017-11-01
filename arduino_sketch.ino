@@ -7,7 +7,6 @@ Bluetooth controled Arduino Car
 int PWM_SLOW 50;  
 int PWM_FAST 200;
 int DIR_DELAY 1000;
-unsigned int pulsesperturn = 20;
 unsigned int RPM_L 0;
 unsigned int RPM_R 0;
 unsigned int counter_L 0;
@@ -71,17 +70,19 @@ void loop() {
 //-----------------------------------------------------------------------------------RPM
   if (millis() - timeold >= 1000){
         detachInterrupt(2);
-        RPM_L = (60 * 1000 / pulsesperturn )/ (millis() - timeold)* counter_L;
-        RPM_R = (60 * 1000 / pulsesperturn )/ (millis() - timeold)* counter_R;
+        RPM_L = (60 * 1000 / 20 )/ (millis() - timeold)* counter_L;
         timeold = millis();
         counter_L = 0;
-        counter_R = 0;
         Serial.print("RPM_L=");
         Serial.println(RPM_L,DEC);
         Serial.print(" "); //placeholder
+        attachInterrupt(2, counter_L, FALLING);
+        detachInterrupt(3);
+        RPM_R = (60 * 1000 / 20 )/ (millis() - timeold)* counter_R;
+        timeold = millis();
+        counter_R = 0;
         Serial.print("RPM_R=");
         Serial.println(RPM_R,DEC);
-        attachInterrupt(2, counter_L, FALLING);
         attachInterrupt(3, counter_R, FALLING);
     }
 
