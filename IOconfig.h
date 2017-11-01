@@ -8,5 +8,5 @@ Pin and IO configuration for RC Car
 #define MOTOR_B_RIGHT_DIR 3
 #define MOTOR_B_RIGHT_PWM 4
 #define BT_STATE 5
-#define TACHO_L 6
-#define TACHO_R 7
+#define TACHO_L 18
+#define TACHO_R 19
