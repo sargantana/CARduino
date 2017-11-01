@@ -3,6 +3,10 @@ Bluetooth controled Arduino Car
 */
 #include "IOconfig.h"
 
+int PWM_SLOW 50;  
+int PWM_FAST 200;
+int DIR_DELAY 1000;
+
 char charreceive;
 
 void goforward();
@@ -13,8 +17,10 @@ void stopcommand();
 
 void setup() {
   
-  pinMode(dir1,OUTPUT);
-  pinMode(dir2,OUTPUT);
+  pinMode(MOTOR_A_LEFT_DIR,OUTPUT);
+  pinMode(MOTOR_A_LEFT_PWM,OUTPUT);
+  pinMode(MOTOR_B_RIGHT_DIR,OUTPUT);
+  pinMode(MOTOR_B_RIGHT_PWM,OUTPUT);
   pinMode(LED,OUTPUT);
   
   for (int i=0; i<=5; i++) { //blink LED 5 times to show car is ready
@@ -30,7 +36,6 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   
   if(Serial.available())
    {
@@ -45,36 +50,76 @@ void loop() {
       case '5':stopcommand();break;
       default:Serial.println("error");
      }
-    }
+    //else{stopcommand();}
+  }
 
 }
+if(digitalRead(BT_STATE)==LOW){stopcommand();} //stop car if Bluetooth connection is lost
+
 void goforward(){
- digitalWrite(dir1,0);
- digitalWrite(dir2,0);
- analogWrite(pwm1,speed1);
- analogWrite(pwm2,speed1);
+        Serial.println( "Forward" );
+        // always stop motors briefly before abrupt changes
+        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
+        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
+        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
+        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
+        delay( DIR_DELAY );
+        // set the motor speed and direction
+        digitalWrite( MOTOR_A_LEFT_DIR, HIGH ); // direction = forward
+        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
+        digitalWrite( MOTOR_B_RIGHT_DIR, HIGH ); // direction = forward
+        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
+    
 }
 void goback(){
- digitalWrite(dir1,1);
- digitalWrite(dir2,1);
- analogWrite(pwm1,speed1);
- analogWrite(pwm2,speed1);
+        Serial.println( "Reverse" );
+        // always stop motors briefly before abrupt changes
+        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
+        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
+        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
+        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
+        delay( DIR_DELAY );
+        // set the motor speed and direction
+        digitalWrite( MOTOR_A_LEFT_DIR, LOW ); // direction = reverse
+        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
+        digitalWrite( MOTOR_B_RIGHT_DIR, LOW ); // direction = reverse
+        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
+  
 }
 void goleft(){
- digitalWrite(dir1,0);
- digitalWrite(dir2,1);
- analogWrite(pwm1,speed1);
- analogWrite(pwm2,speed1);
+        Serial.println( "Left" );
+        // always stop motors briefly before abrupt changes
+        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
+        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
+        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
+        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
+        delay( DIR_DELAY );
+        // set the motor speed and direction
+        digitalWrite( MOTOR_A_LEFT_DIR, LOW ); // direction = reverse
+        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
+        digitalWrite( MOTOR_B_RIGHT_DIR, HIGH ); // direction = forward
+        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
+  
 }
 void goright(){
- digitalWrite(dir1,1);
- digitalWrite(dir2,0);
- analogWrite(pwm1,speed1);
- analogWrite(pwm2,speed1);
+        Serial.println( "Right" );
+        // always stop motors briefly before abrupt changes
+        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
+        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
+        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
+        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
+        delay( DIR_DELAY );
+        // set the motor speed and direction
+        digitalWrite( MOTOR_A_LEFT_DIR, HIGH ); // direction = forward
+        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
+        digitalWrite( MOTOR_B_RIGHT_DIR, LOW ); // direction = reverse
+        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
 }
 
 void stopcommand(){
- analogWrite(pwm1,0);
- analogWrite(pwm2,0);
+        Serial.println( "Stop" );
+        // always stop motors briefly before abrupt changes
+        digitalWrite( MOTOR_B_DIR, LOW );
+        digitalWrite( MOTOR_B_PWM, LOW );
 }
 
