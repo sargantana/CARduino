@@ -1,20 +1,25 @@
 /*
 Bluetooth controled Arduino Car
 */
+//-----------------------------------------------------------------------------------------------VARS
 #include "IOconfig.h"
 
 int PWM_SLOW 50;  
 int PWM_FAST 200;
 int DIR_DELAY 1000;
-
+unsigned int pulsesperturn = 20;
+unsigned int RPM_L 0;
+unsigned int RPM_R 0;
 char charreceive;
-
+//------------------------------------------------------------------------------------------------FUNCTIONS
 void goforward();
 void goleft();
 void goright();
 void goback();
 void stopcommand();
+void docount();
 
+//------------------------------------------------------------------------------------------------SETUP
 void setup() {
   
   pinMode(MOTOR_A_LEFT_DIR,OUTPUT);
@@ -27,14 +32,13 @@ void setup() {
   digitalWrite(LED, HIGH);   
   delay(200);              
   digitalWrite(LED, LOW);    
-  delay(200);              
-  }
-  
+  delay(200);
+  }              
   Serial.begin(9600);
   Serial.println("Car control established");
   delay(500);
-}
-
+  }
+//-------------------------------------------------------------------------------------------------------------LOOP
 void loop() {
   
   if(Serial.available())
@@ -56,6 +60,8 @@ void loop() {
 }
 if(digitalRead(BT_STATE)==LOW){stopcommand();} //stop car if Bluetooth connection is lost
 
+void docount(){counter++;}  //increase count by 1
+
 void goforward(){
         Serial.println( "Forward" );
         // always stop motors briefly before abrupt changes
@@ -69,8 +75,8 @@ void goforward(){
         analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
         digitalWrite( MOTOR_B_RIGHT_DIR, HIGH ); // direction = forward
         analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-    
-}
+        }
+
 void goback(){
         Serial.println( "Reverse" );
         // always stop motors briefly before abrupt changes
@@ -84,8 +90,8 @@ void goback(){
         analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
         digitalWrite( MOTOR_B_RIGHT_DIR, LOW ); // direction = reverse
         analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-  
-}
+        }
+
 void goleft(){
         Serial.println( "Left" );
         // always stop motors briefly before abrupt changes
@@ -99,8 +105,8 @@ void goleft(){
         analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
         digitalWrite( MOTOR_B_RIGHT_DIR, HIGH ); // direction = forward
         analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-  
-}
+        }
+
 void goright(){
         Serial.println( "Right" );
         // always stop motors briefly before abrupt changes
@@ -114,12 +120,12 @@ void goright(){
         analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
         digitalWrite( MOTOR_B_RIGHT_DIR, LOW ); // direction = reverse
         analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-}
+        }
 
 void stopcommand(){
         Serial.println( "Stop" );
         // always stop motors briefly before abrupt changes
         digitalWrite( MOTOR_B_DIR, LOW );
         digitalWrite( MOTOR_B_PWM, LOW );
-}
+        }
 
