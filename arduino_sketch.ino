@@ -6,7 +6,7 @@ Bluetooth controled Arduino Car
 
 int PWM_SLOW 50;  
 int PWM_FAST 200;
-int DIR_DELAY 1000;
+int DIR_DELAY 100;
 unsigned int RPM_L 0;
 unsigned int RPM_R 0;
 unsigned int counter_L 0;
