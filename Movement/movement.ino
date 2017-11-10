@@ -1,162 +1,170 @@
-/*
-Bluetooth controled Arduino Car
-*/
-//-----------------------------------------------------------------------------------------------VARS
+#include "EEPROM.h"
 #include "IOconfig.h"
 
-int PWM_SLOW 50;  
-int PWM_FAST 200;
-int DIR_DELAY 100;
-unsigned int RPM_L 0;
-unsigned int RPM_R 0;
-unsigned int counter_L 0;
-unsigned int counter_R 0;
-char charreceive;
-//------------------------------------------------------------------------------------------------FUNCTIONS
-void goforward();
-void goleft();
-void goright();
-void goback();
-void stopcommand();
-void counter_L();
-void counter_R();
+#define autoOFF 2500  // milliseconds after which the robot stops when the connection is lost
 
-//------------------------------------------------------------------------------------------------SETUP
+#define cmdL 'L'      // UART-command for left motor
+#define cmdR 'R'      // UART-command for right motor
+#define cmdH 'H'      // UART-command for additional channel (for example Horn)
+#define cmdF 'F'      // UART-command for EEPROM operation
+#define cmdr 'r'      // UART-command for EEPROM operation (read)
+#define cmdw 'w'      // UART-command for EEPROM operation (write)
+
+char incomingByte;    // incoming data
+
+char L_Data[4];       // array data for left motor
+byte L_index = 0;     // index of array L
+char R_Data[4];       // array data for right motor
+byte R_index = 0;     // index of array R
+char H_Data[1];       // array data for additional channel
+byte H_index = 0;     // index of array H
+char F_Data[8];       // array data for  EEPROM
+byte F_index = 0;     // index of array F
+char command;         // command
+
+unsigned long currentTime, lastTimeCommand, autoOFF;
+
 void setup() {
-  
-  pinMode(MOTOR_A_LEFT_DIR,OUTPUT);
-  pinMode(MOTOR_A_LEFT_PWM,OUTPUT);
-  pinMode(MOTOR_B_RIGHT_DIR,OUTPUT);
-  pinMode(MOTOR_B_RIGHT_PWM,OUTPUT);
-  pinMode(LED,OUTPUT);
-  pinMode(TACHO_L, INPUT);
-  pinMode(TACHO_R, INPUT);
-  
-  for (int i=0; i<=5; i++) { //blink LED 5 times to show car is ready
-  digitalWrite(LED, HIGH);   
-  delay(200);              
-  digitalWrite(LED, LOW);    
-  delay(200);
-  }              
-  attachInterrupt(2, counter_L, FALLING);
-  attachInterrupt(3, counter_R, FALLING);
-  counter_L = 0;
-  counter_R = 0;
-  RPM_L = 0;
-  RPM_R = 0;
-  timeold = 0;
-  Serial.begin(9600);
-  Serial.println("Car control established");
-  delay(500);
-  }
-//-------------------------------------------------------------------------------------------------------------LOOP
-void loop() {
-  
-  if(Serial.available())
-   {
-    charreceive=char(Serial.read());
-    Serial.println("get:"+charreceive);     
-    switch(charreceive)
-    {
-      case '8':goforward();break;
-      case '4':goleft();break;
-      case '6':goright();break;
-      case '2':goback();break;
-      case '5':stopcommand();break;
-      default:Serial.println("error");
-     }
-    //else{stopcommand();}
-  }
-//-----------------------------------------------------------------------------------RPM
-  if (millis() - timeold >= 1000){
-        detachInterrupt(2);
-        RPM_L = (60 * 1000 / 20 )/ (millis() - timeold)* counter_L;
-        timeold = millis();
-        counter_L = 0;
-        Serial.print("RPM_L=");
-        Serial.println(RPM_L,DEC);
-        Serial.print(" "); //placeholder
-        attachInterrupt(2, counter_L, FALLING);
-        detachInterrupt(3);
-        RPM_R = (60 * 1000 / 20 )/ (millis() - timeold)* counter_R;
-        timeold = millis();
-        counter_R = 0;
-        Serial.print("RPM_R=");
-        Serial.println(RPM_R,DEC);
-        attachInterrupt(3, counter_R, FALLING);
-    }
-
-
-if(digitalRead(BT_STATE)==LOW){stopcommand();} //stop car if Bluetooth connection is lost
+  Serial.begin(9600);       // initialization UART
+  pinMode(HORN, OUTPUT);    // additional channel
+  pinMode(MOTOR_A_LEFT_DIR, OUTPUT);      // output for motor rotation
+  pinMode(MOTOR_A_RIGHT_DIR, OUTPUT);      // output for motor rotation
+  /*EEPROM.write(0,255);
+  EEPROM.write(1,255);
+  EEPROM.write(2,255);
+  EEPROM.write(3,255);*/
+  timer_init();             // initialization software timer
 }
 
-//------------------------------------------------------------------------------------FUNCTION-DEFINITIONS
-void counter_L(){counter_L++;}  //increase count by 1
-void counter_R(){counter_R++;}  //increase count by 1
-//------------------------------------------------------------------------------------COUNTER
-void goforward(){
-        Serial.println( "Forward" );
-        // always stop motors briefly before abrupt changes
-        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
-        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
-        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
-        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
-        delay( DIR_DELAY );
-        // set the motor speed and direction
-        digitalWrite( MOTOR_A_LEFT_DIR, HIGH ); // direction = forward
-        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
-        digitalWrite( MOTOR_B_RIGHT_DIR, HIGH ); // direction = forward
-        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-        }
+void timer_init() {
+  uint8_t sw_autoOFF = EEPROM.read(0);   // read EEPROM "is activated or not stopping the car when losing connection"
+  if(sw_autoOFF == '1'){                 // if activated
+    char var_Data[3];
+    var_Data[0] = EEPROM.read(1);
+    var_Data[1] = EEPROM.read(2);
+    var_Data[2] = EEPROM.read(3);
+    autoOFF = atoi(var_Data)*100;        // variable autoOFF ms
+  }
+  else if(sw_autoOFF == '0'){        
+    autoOFF = 999999;
+  }
+  else if(sw_autoOFF == 255){
+    autoOFF = 2500;                      // if the EEPROM is blank, dafault value is 2.5 sec
+  }
+  currentTime = millis();                // read the time elapsed since application start
+}
+ 
+void loop() {
+  if (Serial.available() > 0) {          // if received UART data
+    incomingByte = Serial.read();        // raed byte
+    if(incomingByte == cmdL) {           // if received data for left motor L
+      command = cmdL;                    // current command
+      memset(L_Data,0,sizeof(L_Data));   // clear array
+      L_index = 0;                       // resetting array index
+    }
+    else if(incomingByte == cmdR) {      // if received data for left motor R
+      command = cmdR;
+      memset(R_Data,0,sizeof(R_Data));
+      R_index = 0;
+    }
+    else if(incomingByte == cmdH) {      // if received data for additional channel
+      command = cmdH;
+      memset(H_Data,0,sizeof(H_Data));
+      H_index = 0;
+    }   
+    else if(incomingByte == cmdF) {      // if received data for EEPROM op
+      command = cmdF;
+      memset(F_Data,0,sizeof(F_Data));
+      F_index = 0;
+    }
+    else if(incomingByte == '\r') command = 'e';   // end of line
+    else if(incomingByte == '\t') command = 't';   // end of line for EEPROM op
+    
+    if(command == cmdL && incomingByte != cmdL){
+      L_Data[L_index] = incomingByte;              // store each byte in the array
+      L_index++;                                   // increment array index
+    }
+    else if(command == cmdR && incomingByte != cmdR){
+      R_Data[R_index] = incomingByte;
+      R_index++;
+    }
+    else if(command == cmdH && incomingByte != cmdH){
+      H_Data[H_index] = incomingByte;
+      H_index++;
+    }   
+    else if(command == cmdF && incomingByte != cmdF){
+      F_Data[F_index] = incomingByte;
+      F_index++;
+    }   
+    else if(command == 'e'){                       // if we take the line end
+      Control4WD(atoi(L_Data),atoi(R_Data),atoi(H_Data));
+      delay(10);
+    }
+    else if(command == 't'){                       // if we take the EEPROM line end
+      Flash_Op(F_Data[0],F_Data[1],F_Data[2],F_Data[3],F_Data[4]);
+    }
+    lastTimeCommand = millis();                    // read the time elapsed since application start
+  }
+  if(millis() >= (lastTimeCommand + autoOFF)){     // compare the current timer with variable lastTimeCommand + autoOFF
+    Control4WD(0,0,0);                             // stop the car
+  }
+}
 
-void goback(){
-        Serial.println( "Reverse" );
-        // always stop motors briefly before abrupt changes
-        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
-        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
-        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
-        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
-        delay( DIR_DELAY );
-        // set the motor speed and direction
-        digitalWrite( MOTOR_A_LEFT_DIR, LOW ); // direction = reverse
-        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
-        digitalWrite( MOTOR_B_RIGHT_DIR, LOW ); // direction = reverse
-        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-        }
+void Control4WD(int mLeft, int mRight, uint8_t Horn){
 
-void goleft(){
-        Serial.println( "Left" );
-        // always stop motors briefly before abrupt changes
-        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
-        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
-        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
-        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
-        delay( DIR_DELAY );
-        // set the motor speed and direction
-        digitalWrite( MOTOR_A_LEFT_DIR, LOW ); // direction = reverse
-        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
-        digitalWrite( MOTOR_B_RIGHT_DIR, HIGH ); // direction = forward
-        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-        }
+  bool directionL, directionR;      // direction of motor rotation L298N
+  byte valueL, valueR;              // PWM MOTOR_A_LEFT_PWM, MOTOR_A_RIGHT_PWM (0-255)
+  
+  if(mLeft > 0){
+    valueL = mLeft;
+    directionL = 0;
+  }
+  else if(mLeft < 0){
+    valueL = 255 - abs(mLeft);
+    directionL = 1;
+  }
+  else {
+    directionL = 0;
+    valueL = 0;
+  }
+ 
+  if(mRight > 0){
+    valueR = mRight;
+    directionR = 0;
+  }
+  else if(mRight < 0){
+    valueR = 255 - abs(mRight);
+    directionR = 1;
+  }
+  else {
+    directionR = 0;
+    valueR = 0;
+  }
+   
+  analogWrite(MOTOR_A_LEFT_PWM, valueL);            // set speed for left motor
+  analogWrite(MOTOR_A_RIGHT_PWM, valueR);            // set speed for right motor
+  digitalWrite(MOTOR_A_LEFT_DIR, directionL);       // set direction of left motor rotation
+  digitalWrite(MOTOR_A_RIGHT_DIR, directionR);       // set direction of right motor rotation
+  
+  digitalWrite(HORN, Horn);           // additional channel
+}
 
-void goright(){
-        Serial.println( "Right" );
-        // always stop motors briefly before abrupt changes
-        digitalWrite( MOTOR_A_LEFT_DIR, LOW );
-        digitalWrite( MOTOR_A_LEFT_PWM, LOW );
-        digitalWrite( MOTOR_B_RIGHT_DIR, LOW );
-        digitalWrite( MOTOR_B_RIGHT_PWM, LOW );
-        delay( DIR_DELAY );
-        // set the motor speed and direction
-        digitalWrite( MOTOR_A_LEFT_DIR, HIGH ); // direction = forward
-        analogWrite( MOTOR_A_LEFT_PWM, 255-PWM_FAST );
-        digitalWrite( MOTOR_B_RIGHT_DIR, LOW ); // direction = reverse
-        analogWrite( MOTOR_B_RIGHT_PWM, 255-PWM_FAST );
-        }
+void Flash_Op(char FCMD, uint8_t z1, uint8_t z2, uint8_t z3, uint8_t z4){
 
-void stopcommand(){
-        Serial.println( "Stop" );
-        // always stop motors briefly before abrupt changes
-        digitalWrite( MOTOR_B_DIR, LOW );
-        digitalWrite( MOTOR_B_PWM, LOW );
-        }
+  if(FCMD == cmdr){           // if EEPROM data read command
+    Serial.print("FData:");       // send EEPROM data
+    Serial.write(EEPROM.read(0));     // read value from the memory with 0 address and print it to UART
+    Serial.write(EEPROM.read(1));
+    Serial.write(EEPROM.read(2));
+    Serial.write(EEPROM.read(3));
+    Serial.print("\r\n");         // mark the end of the transmission of data EEPROM
+  }
+  else if(FCMD == cmdw){          // if EEPROM data write command
+    EEPROM.write(0,z1);               // z1 record to a memory with 0 address
+    EEPROM.write(1,z2);
+    EEPROM.write(2,z3);
+    EEPROM.write(3,z4);
+    timer_init();             // reinitialize the timer
+    Serial.print("FWOK\r\n");         // send a message that the data is successfully written to EEPROM
+  }
+}
